@@ -33,8 +33,6 @@ int verbose;
 //      Predictor Data Structures     //
 //------------------------------------//
 
-uint8_t* globalHistory; // Global History
-
 //
 //TODO: Add your own Branch Predictor data structures here
 //
@@ -52,8 +50,6 @@ init_predictor()
   //
   //TODO: Initialize Branch Predictor Data Structures
   //
-  globalHistory = (uint8_t*)malloc(ghistoryBits * sizeof(uint8_t));
-
 }
 
 // Make a prediction for conditional branch instruction at PC 'pc'
@@ -72,16 +68,6 @@ make_prediction(uint32_t pc)
     case STATIC:
       return TAKEN;
     case GSHARE:
-      uint32_t xor = 0;
-      for (int i = ghistoryBits - 1; i >= 0; i--)
-      {
-        uint8_t historyBit = globalHistory[i];
-        xor <<= 1;
-        xor += (historyBit ^ (pc % 2));
-        pc >>= 1;
-      }
-
-      // xor
     case TOURNAMENT:
     case CUSTOM:
     default:

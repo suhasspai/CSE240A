@@ -6,6 +6,7 @@
 //  described in the README                               //
 //========================================================//
 #include <stdio.h>
+#include <math.h>
 #include "predictor.h"
 
 //
@@ -33,11 +34,13 @@ int verbose;
 //      Predictor Data Structures     //
 //------------------------------------//
 
-uint8_t* globalHistory; // Global History
-
 //
 //TODO: Add your own Branch Predictor data structures here
 //
+
+// GShare Data Structures
+uint8_t* globalHistoryTable; // Global History Table for GShare
+uint32_t globalHistory;      // Store the History
 
 
 //------------------------------------//
@@ -52,7 +55,27 @@ init_predictor()
   //
   //TODO: Initialize Branch Predictor Data Structures
   //
-  globalHistory = (uint8_t*)malloc(ghistoryBits * sizeof(uint8_t));
+
+  //GShare Initialization
+  switch (bpType) {
+    case STATIC:
+      return;
+    case GSHARE:
+      uint8_t globalHistoryTableEntries = (uint8_t) pow(2, ghistoryBits); // Global History Table will have 2^(number of history bits) entries
+      globalHistoryTable = (uint8_t*)malloc(globalHistoryTableEntries * sizeof(uint8_t));
+
+      for (uint8_t i = 0; i < globalHistoryTableEntries; i++) {
+        globalHistoryTable[i] = SN; // initialize to strong not-taken
+      }
+      // If we start the program here, our history is nothing. Initialize globalHistory to 0
+      globalHistory = 0;
+      break;
+    case TOURNAMENT:
+    case CUSTOM:
+    default:
+      break;
+  }
+
 
 }
 
@@ -72,16 +95,24 @@ make_prediction(uint32_t pc)
     case STATIC:
       return TAKEN;
     case GSHARE:
-      uint32_t xor = 0;
-      for (int i = ghistoryBits - 1; i >= 0; i--)
-      {
-        uint8_t historyBit = globalHistory[i];
-        xor <<= 1;
-        xor += (historyBit ^ (pc % 2));
-        pc >>= 1;
+      uint32_t xorResult = pc ^ globalHistory;
+
+      if (globalHistoryTable[xorResult] == WT || globalHistoryTable[xorResult] == ST){
+        return TAKEN;
+      } else {
+        return NOTTAKEN;
       }
 
-      //xor
+      // for (int i = ghistoryBits - 1; i >= 0; i--)
+      // {
+      //   uint8_t historyBit = globalHistoryTable[i];
+      //   xor <<= 1;
+      //   xor += (historyBit ^ (pc % 2)); 
+      //   pc >>= 1;
+      // }
+
+      // Why are you doing pc % 2 suhas, I still don't get it.
+
     case TOURNAMENT:
     case CUSTOM:
     default:
@@ -102,10 +133,22 @@ train_predictor(uint32_t pc, uint8_t outcome)
   //
   //TODO: Implement Predictor training
   //
-  uint8_t prediction = make_prediction(pc);
-  // Shift global history bits to left and append outcome
-  if (prediction == outcome)
-  {
-    
+
+  switch (bpType) {
+  case STATIC:
+    break;
+  case GSHARE:
+    uint8_t prediction = make_prediction(pc);
+    if ((outcome == TAKEN) && ((prediction == ST || prediction == WT))) {
+      // set index of that entry in globalHistoryTable to ST
+      // how to do that?
+    }
+  case TOURNAMENT:
+  case CUSTOM:
+  default:
+    break;
   }
+  
+  // Shift global history bits to left and append outcome
+  
 }
