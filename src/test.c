@@ -11,9 +11,9 @@
 //
 // TODO:Student Information
 //
-const char *studentName = "NAME";
-const char *studentID   = "PID";
-const char *email       = "EMAIL";
+const char *studentName = "Suhas Pai";
+const char *studentID   = "A59001665";
+const char *email       = "sspai@ucsd.edu";
 
 //------------------------------------//
 //      Predictor Configuration       //
@@ -81,7 +81,7 @@ make_prediction(uint32_t pc)
         pc >>= 1;
       }
 
-      // xor
+      //xor
     case TOURNAMENT:
     case CUSTOM:
     default:
@@ -102,4 +102,10 @@ train_predictor(uint32_t pc, uint8_t outcome)
   //
   //TODO: Implement Predictor training
   //
+  uint8_t prediction = make_prediction(pc);
+  // Shift global history bits to left and append outcome
+  if (prediction == outcome)
+  {
+    
+  }
 }
