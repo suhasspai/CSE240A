@@ -97,7 +97,7 @@ make_prediction(uint32_t pc)
     case GSHARE:
       uint32_t xorResult = pc ^ globalHistory;
 
-      if (globalHistoryTable[xorResult] == WT || globalHistoryTable[xorResult] == ST){
+      if (globalHistoryTable[xorResult] == WT || globalHistoryTable[xorResult] == ST) {
         return TAKEN;
       } else {
         return NOTTAKEN;
@@ -139,10 +139,18 @@ train_predictor(uint32_t pc, uint8_t outcome)
     break;
   case GSHARE:
     uint8_t prediction = make_prediction(pc);
-    if ((outcome == TAKEN) && ((prediction == ST || prediction == WT))) {
-      // set index of that entry in globalHistoryTable to ST
-      // how to do that?
+    uint8_t xorResult = pc ^ globalHistory;
+    uint8_t currentValue = globalHistoryTable[xorResult];
+    
+    if (outcome == TAKEN && currentValue < ST) {
+      currentValue++;
     }
+
+    if (outcome == 0 && currentValue > SN) {
+      currentValue--;
+    }
+
+    globalHistoryTable[xorResult] = currentValue;
   case TOURNAMENT:
   case CUSTOM:
   default:
