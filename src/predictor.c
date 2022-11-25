@@ -6,7 +6,6 @@
 //  described in the README                               //
 //========================================================//
 #include <stdio.h>
-#include <math.h>
 #include "predictor.h"
 
 //
@@ -60,15 +59,17 @@ init_predictor()
     case GSHARE:
 
       // init gShare
-      globalHistoryTableEntries = (uint8_t) pow(2, ghistoryBits);
+      globalHistoryTableEntries = 1 << ghistoryBits;
       globalHistoryTable = (uint8_t*)malloc(globalHistoryTableEntries * sizeof(uint8_t));
 
       for (uint8_t i = 0; i < globalHistoryTableEntries; i++) {
-        globalHistoryTable[i] = SN; 
+        globalHistoryTable[i] = WN; 
+        
       }
       
       globalHistory = 0;
-      break;
+      return;
+
     case TOURNAMENT:
     case CUSTOM:
     default:
@@ -90,17 +91,17 @@ make_prediction(uint32_t pc)
     case STATIC:
       return TAKEN;
     case GSHARE:
-
       // predict gShare
-      uint32_t xorResult = pc ^ globalHistory;
+      {
+        uint32_t xorResult = pc ^ globalHistory;
 
-      if (globalHistoryTable[xorResult] == WT || globalHistoryTable[xorResult] == ST){
-        return TAKEN;
-      } else {
-        return NOTTAKEN;
+        if (globalHistoryTable[xorResult] == WT || globalHistoryTable[xorResult] == ST){
+          return TAKEN;
+        } else {
+          return NOTTAKEN;
+        }
       }
-
-      return NOTTAKEN;
+      break;
 
     case TOURNAMENT:
     case CUSTOM:
@@ -125,38 +126,20 @@ train_predictor(uint32_t pc, uint8_t outcome)
   case GSHARE:
 
     // train gShare
-    uint8_t prediction = pc ^ globalHistory;
+    {
+      uint8_t prediction = pc ^ globalHistory;
 
-    if (outcome == TAKEN && globalHistoryTable[prediction] == WN) {
-      globalHistoryTable[prediction] = WT;
-    }
-    else {
-      globalHistoryTable[prediction] = SN;
-    }
+      if(outcome == TAKEN && globalHistoryTable[prediction] < ST){
+        globalHistoryTable[prediction]++;
+      } 
+      if (outcome == NOTTAKEN && globalHistoryTable[prediction] > SN){
+        globalHistoryTable[prediction]--;
+      }
 
-    if (outcome == TAKEN && globalHistoryTable[prediction] == SN) {
-      globalHistoryTable[prediction] = WN;
+      globalHistory = (globalHistory << 1) | outcome;
+      return;
     }
-    else {
-      globalHistoryTable[prediction] = SN;
-    }
-
-    if (outcome == TAKEN && globalHistoryTable[prediction] == WT) {
-      globalHistoryTable[prediction] = ST;
-    }
-    else {
-      globalHistoryTable[prediction] = WN;
-    }
-
-    if (outcome == TAKEN && globalHistoryTable[prediction] == ST) {
-      globalHistoryTable[prediction] = ST;
-    }
-    else {
-      globalHistoryTable[prediction] = WT;
-    }
-
-    globalHistory = (globalHistory << 1) | outcome;
-
+    break;
   case TOURNAMENT:
   case CUSTOM:
   default:
