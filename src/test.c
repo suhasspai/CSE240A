@@ -12,9 +12,9 @@
 //
 // TODO:Student Information
 //
-const char *studentName = "Suhas Pai";
-const char *studentID   = "A59001665";
-const char *email       = "sspai@ucsd.edu";
+const char *studentName = "NAME";
+const char *studentID   = "PID";
+const char *email       = "EMAIL";
 
 //------------------------------------//
 //      Predictor Configuration       //
@@ -40,7 +40,8 @@ int verbose;
 
 // GShare Data Structures
 uint8_t* globalHistoryTable; // Global History Table for GShare
-uint32_t globalHistory;      // Store the History
+uint8_t globalHistoryTableEntries;
+uint8_t globalHistory;      // Store the History
 
 
 //------------------------------------//
@@ -52,22 +53,20 @@ uint32_t globalHistory;      // Store the History
 void
 init_predictor()
 {
-  //
-  //TODO: Initialize Branch Predictor Data Structures
-  //
-
   //GShare Initialization
   switch (bpType) {
     case STATIC:
       return;
     case GSHARE:
-      uint8_t globalHistoryTableEntries = (uint8_t) pow(2, ghistoryBits); // Global History Table will have 2^(number of history bits) entries
+
+      // init gShare
+      globalHistoryTableEntries = (uint8_t) pow(2, ghistoryBits);
       globalHistoryTable = (uint8_t*)malloc(globalHistoryTableEntries * sizeof(uint8_t));
 
       for (uint8_t i = 0; i < globalHistoryTableEntries; i++) {
-        globalHistoryTable[i] = SN; // initialize to strong not-taken
+        globalHistoryTable[i] = SN; 
       }
-      // If we start the program here, our history is nothing. Initialize globalHistory to 0
+      
       globalHistory = 0;
       break;
     case TOURNAMENT:
@@ -86,15 +85,13 @@ init_predictor()
 uint8_t
 make_prediction(uint32_t pc)
 {
-  //
-  //TODO: Implement prediction scheme
-  //
-
   // Make a prediction based on the bpType
   switch (bpType) {
     case STATIC:
       return TAKEN;
     case GSHARE:
+
+      // predict gShare
       uint32_t xorResult = pc ^ globalHistory;
 
       if (globalHistoryTable[xorResult] == WT || globalHistoryTable[xorResult] == ST){
@@ -103,15 +100,7 @@ make_prediction(uint32_t pc)
         return NOTTAKEN;
       }
 
-      // for (int i = ghistoryBits - 1; i >= 0; i--)
-      // {
-      //   uint8_t historyBit = globalHistoryTable[i];
-      //   xor <<= 1;
-      //   xor += (historyBit ^ (pc % 2)); 
-      //   pc >>= 1;
-      // }
-
-      // Why are you doing pc % 2 suhas, I still don't get it.
+      return NOTTAKEN;
 
     case TOURNAMENT:
     case CUSTOM:
@@ -130,19 +119,44 @@ make_prediction(uint32_t pc)
 void
 train_predictor(uint32_t pc, uint8_t outcome)
 {
-  //
-  //TODO: Implement Predictor training
-  //
-
   switch (bpType) {
   case STATIC:
     break;
   case GSHARE:
-    uint8_t prediction = make_prediction(pc);
-    if ((outcome == TAKEN) && ((prediction == ST || prediction == WT))) {
-      // set index of that entry in globalHistoryTable to ST
-      // how to do that?
+
+    // train gShare
+    uint8_t prediction = pc ^ globalHistory;
+
+    if (outcome == TAKEN && globalHistoryTable[prediction] == WN) {
+      globalHistoryTable[prediction] = WT;
     }
+    else {
+      globalHistoryTable[prediction] = SN;
+    }
+
+    if (outcome == TAKEN && globalHistoryTable[prediction] == SN) {
+      globalHistoryTable[prediction] = WN;
+    }
+    else {
+      globalHistoryTable[prediction] = SN;
+    }
+
+    if (outcome == TAKEN && globalHistoryTable[prediction] == WT) {
+      globalHistoryTable[prediction] = ST;
+    }
+    else {
+      globalHistoryTable[prediction] = WN;
+    }
+
+    if (outcome == TAKEN && globalHistoryTable[prediction] == ST) {
+      globalHistoryTable[prediction] = ST;
+    }
+    else {
+      globalHistoryTable[prediction] = WT;
+    }
+
+    globalHistory = (globalHistory << 1) | outcome;
+
   case TOURNAMENT:
   case CUSTOM:
   default:
