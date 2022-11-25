@@ -6,6 +6,7 @@
 //  described in the README                               //
 //========================================================//
 #include <stdio.h>
+#include <math.h>
 #include "predictor.h"
 
 //
@@ -37,6 +38,11 @@ int verbose;
 //TODO: Add your own Branch Predictor data structures here
 //
 
+// GShare Data Structures
+uint8_t* globalHistoryTable; // Global History Table for GShare
+uint8_t globalHistoryTableEntries;
+uint8_t globalHistory;      // Store the History
+
 
 //------------------------------------//
 //        Predictor Functions         //
@@ -47,9 +53,29 @@ int verbose;
 void
 init_predictor()
 {
-  //
-  //TODO: Initialize Branch Predictor Data Structures
-  //
+  //GShare Initialization
+  switch (bpType) {
+    case STATIC:
+      return;
+    case GSHARE:
+
+      // init gShare
+      globalHistoryTableEntries = (uint8_t) pow(2, ghistoryBits);
+      globalHistoryTable = (uint8_t*)malloc(globalHistoryTableEntries * sizeof(uint8_t));
+
+      for (uint8_t i = 0; i < globalHistoryTableEntries; i++) {
+        globalHistoryTable[i] = SN; 
+      }
+      
+      globalHistory = 0;
+      break;
+    case TOURNAMENT:
+    case CUSTOM:
+    default:
+      break;
+  }
+
+
 }
 
 // Make a prediction for conditional branch instruction at PC 'pc'
@@ -59,15 +85,23 @@ init_predictor()
 uint8_t
 make_prediction(uint32_t pc)
 {
-  //
-  //TODO: Implement prediction scheme
-  //
-
   // Make a prediction based on the bpType
   switch (bpType) {
     case STATIC:
       return TAKEN;
     case GSHARE:
+
+      // predict gShare
+      uint32_t xorResult = pc ^ globalHistory;
+
+      if (globalHistoryTable[xorResult] == WT || globalHistoryTable[xorResult] == ST){
+        return TAKEN;
+      } else {
+        return NOTTAKEN;
+      }
+
+      return NOTTAKEN;
+
     case TOURNAMENT:
     case CUSTOM:
     default:
@@ -85,7 +119,50 @@ make_prediction(uint32_t pc)
 void
 train_predictor(uint32_t pc, uint8_t outcome)
 {
-  //
-  //TODO: Implement Predictor training
-  //
+  switch (bpType) {
+  case STATIC:
+    break;
+  case GSHARE:
+
+    // train gShare
+    uint8_t prediction = pc ^ globalHistory;
+
+    if (outcome == TAKEN && globalHistoryTable[prediction] == WN) {
+      globalHistoryTable[prediction] = WT;
+    }
+    else {
+      globalHistoryTable[prediction] = SN;
+    }
+
+    if (outcome == TAKEN && globalHistoryTable[prediction] == SN) {
+      globalHistoryTable[prediction] = WN;
+    }
+    else {
+      globalHistoryTable[prediction] = SN;
+    }
+
+    if (outcome == TAKEN && globalHistoryTable[prediction] == WT) {
+      globalHistoryTable[prediction] = ST;
+    }
+    else {
+      globalHistoryTable[prediction] = WN;
+    }
+
+    if (outcome == TAKEN && globalHistoryTable[prediction] == ST) {
+      globalHistoryTable[prediction] = ST;
+    }
+    else {
+      globalHistoryTable[prediction] = WT;
+    }
+
+    globalHistory = (globalHistory << 1) | outcome;
+
+  case TOURNAMENT:
+  case CUSTOM:
+  default:
+    break;
+  }
+  
+  // Shift global history bits to left and append outcome
+  
 }
