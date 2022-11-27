@@ -41,7 +41,7 @@ int verbose;
 uint8_t* globalHistoryTable; // Global History Table for GShare
 uint8_t globalHistoryTableEntries;
 uint8_t globalHistory;      // Store the History
-
+uint8_t indexMask;
 
 //------------------------------------//
 //        Predictor Functions         //
@@ -60,6 +60,7 @@ init_predictor()
 
       // init gShare
       globalHistoryTableEntries = 1 << ghistoryBits;
+      indexMask = globalHistoryTableEntries - 1;
       globalHistoryTable = (uint8_t*)malloc(globalHistoryTableEntries * sizeof(uint8_t));
 
       for (uint8_t i = 0; i < globalHistoryTableEntries; i++) {
@@ -75,8 +76,6 @@ init_predictor()
     default:
       break;
   }
-
-
 }
 
 // Make a prediction for conditional branch instruction at PC 'pc'
@@ -93,7 +92,7 @@ make_prediction(uint32_t pc)
     case GSHARE:
       // predict gShare
       {
-        uint32_t xorResult = pc ^ globalHistory;
+        uint32_t xorResult = (pc & indexMask) ^ (globalHistory & indexMask);
 
         if (globalHistoryTable[xorResult] == WT || globalHistoryTable[xorResult] == ST){
           return TAKEN;
@@ -127,7 +126,7 @@ train_predictor(uint32_t pc, uint8_t outcome)
 
     // train gShare
     {
-      uint8_t prediction = pc ^ globalHistory;
+      uint8_t prediction = (pc & indexMask) ^ (globalHistory & indexMask);
 
       if(outcome == TAKEN && globalHistoryTable[prediction] < ST){
         globalHistoryTable[prediction]++;
@@ -136,6 +135,7 @@ train_predictor(uint32_t pc, uint8_t outcome)
         globalHistoryTable[prediction]--;
       }
 
+      // Shift global history bits to left and append outcome
       globalHistory = (globalHistory << 1) | outcome;
       return;
     }
@@ -145,7 +145,4 @@ train_predictor(uint32_t pc, uint8_t outcome)
   default:
     break;
   }
-  
-  // Shift global history bits to left and append outcome
-  
 }
