@@ -8,9 +8,6 @@
 #include <stdio.h>
 #include "predictor.h"
 
-//
-// TODO:Student Information
-//
 const char *studentName = "NAME";
 const char *studentID   = "PID";
 const char *email       = "EMAIL";
@@ -33,45 +30,70 @@ int verbose;
 //      Predictor Data Structures     //
 //------------------------------------//
 
-//
-//TODO: Add your own Branch Predictor data structures here
-//
-
-// GShare Data Structures
-uint8_t* globalHistoryTable; // Global History Table for GShare
+// gShare
+uint8_t* globalHistoryTable;
 uint8_t globalHistoryTableEntries;
-uint8_t globalHistory;      // Store the History
+uint8_t globalHistory;
 uint8_t indexMask;
+
+// touranment
+uint8_t* localHistoryTable;
+uint8_t* selector;
+uint8_t localHistoryTableEntries;
+uint8_t selectorTableEntries;
+uint8_t localIndexMask;
+uint8_t globalIndexMask;
+uint8_t selectorIndexMask;
 
 //------------------------------------//
 //        Predictor Functions         //
 //------------------------------------//
 
 // Initialize the predictor
-//
 void
 init_predictor()
 {
-  //GShare Initialization
   switch (bpType) {
     case STATIC:
       return;
     case GSHARE:
-
       // init gShare
-      globalHistoryTableEntries = 1 << ghistoryBits;
-      indexMask = globalHistoryTableEntries - 1;
-      globalHistoryTable = (uint8_t*)malloc(globalHistoryTableEntries * sizeof(uint8_t));
-
-      for (uint8_t i = 0; i < globalHistoryTableEntries; i++) {
-        globalHistoryTable[i] = WN; 
+      {
+        globalHistoryTableEntries = 1 << ghistoryBits;
+        indexMask = globalHistoryTableEntries - 1;
         
+        globalHistoryTable = (uint8_t*)malloc(globalHistoryTableEntries * sizeof(uint8_t));
+
+        for (uint8_t i = 0; i < globalHistoryTableEntries; i++) {
+          globalHistoryTable[i] = WN; 
+        }
       }
-      
       globalHistory = 0;
-      return;
+      break;
 
     case TOURNAMENT:
+      // init tournament
+      {
+        globalHistoryTableEntries = 1 << ghistoryBits;
+        localHistoryTableEntries = 1 << lhistoryBits;
+        selectorTableEntries = 1 << pcIndexBits;
+
+        globalHistoryTable = (uint8_t*)malloc(globalHistoryTableEntries * sizeof(uint8_t));
+        localHistoryTable = (uint8_t*)malloc(localHistoryTableEntries * sizeof(uint8_t));
+        selector = (uint8_t*)malloc(selectorTableEntries * sizeof(uint8_t));
+
+        for (uint8_t i = 0; i < globalHistoryTableEntries; i++) {
+          globalHistoryTable[i] = WN; 
+          selector[i] = TWT; // weal taken global predictor
+        }
+
+        for (uint8_t i = 0; i < localHistoryTableEntries; i++) {
+          localHistoryTable[i] = WN; 
+        }
+
+      }
+      break;
+
     case CUSTOM:
     default:
       break;
@@ -81,7 +103,6 @@ init_predictor()
 // Make a prediction for conditional branch instruction at PC 'pc'
 // Returning TAKEN indicates a prediction of taken; returning NOTTAKEN
 // indicates a prediction of not taken
-//
 uint8_t
 make_prediction(uint32_t pc)
 {
@@ -103,6 +124,40 @@ make_prediction(uint32_t pc)
       break;
 
     case TOURNAMENT:
+      // predict tournament
+      {
+        uint8_t localPrediction;
+        uint8_t globalPrediction;
+
+        uint8_t _pc = pc & selectorIndexMask;
+
+        // local predictor
+        uint8_t localXorResult = (localHistoryTable[_pc] & localIndexMask);
+
+        if (localHistoryTable[localXorResult] == WT || localHistoryTable[localXorResult] == ST){
+          localPrediction = TAKEN;
+        } else {
+          localPrediction = NOTTAKEN;
+        }
+
+        // global predictor
+        uint32_t globalXorResult = globalHistory & globalIndexMask;
+
+        if (globalHistoryTable[globalXorResult] == WT || globalHistoryTable[globalXorResult] == ST){
+          globalPrediction = TAKEN;
+        } else {
+          globalPrediction = NOTTAKEN;
+        }
+
+        // selector
+        if (selector[globalXorResult] == TWT || selector[globalXorResult] == TST) {
+          return globalPrediction;
+        } else {
+          return localPrediction;
+        }
+      }
+      break;
+
     case CUSTOM:
     default:
       break;
@@ -137,10 +192,72 @@ train_predictor(uint32_t pc, uint8_t outcome)
 
       // Shift global history bits to left and append outcome
       globalHistory = (globalHistory << 1) | outcome;
-      return;
     }
     break;
   case TOURNAMENT:
+    // train tournament
+    {
+      uint8_t localResult;
+      uint8_t globalResult;
+
+      uint8_t _pc = pc & selectorIndexMask;
+
+      // local predictor
+      uint8_t localXorResult = (localHistoryTable[_pc] & localIndexMask);
+
+      if (localHistoryTable[localXorResult] == WT || localHistoryTable[localXorResult] == ST){
+        if (outcome == TAKEN) {
+          localResult = LOCAL_CORRECT;
+        } else {
+          localResult = LOCAL_INCORRECT;
+        }
+      } else {
+        if (outcome == NOTTAKEN) {
+          localResult = LOCAL_CORRECT;
+        } else {
+          localResult = LOCAL_INCORRECT;
+        }
+      }
+
+      if(outcome == TAKEN && globalHistoryTable[localXorResult] < ST){
+        localHistoryTable[localXorResult]++;
+      } 
+      if (outcome == NOTTAKEN && globalHistoryTable[localXorResult] > SN){
+        localHistoryTable[localXorResult]--;
+      }
+
+      localHistoryTable[_pc] = (localHistoryTable[_pc] << 1 | outcome) & localIndexMask;
+
+      // global predictor
+      uint32_t globalXorResult = globalHistory & globalIndexMask;
+
+      if (globalHistoryTable[globalXorResult] == WT || globalHistoryTable[globalXorResult] == ST){
+        if (outcome == TAKEN) {
+          globalResult = GLOBAL_CORRECT;
+        } else {
+          globalResult = GLOBAL_INCORRECT;
+        }
+      } else {
+        if (outcome == NOTTAKEN) {
+          globalResult = GLOBAL_CORRECT;
+        } else {
+          globalResult = GLOBAL_INCORRECT;
+        }
+      }
+
+      if(outcome == TAKEN && globalHistoryTable[globalXorResult] < ST){
+        globalHistoryTable[globalXorResult]++;
+      } 
+      if (outcome == NOTTAKEN && globalHistoryTable[globalXorResult] > SN){
+        globalHistoryTable[globalXorResult]--;
+      }
+
+      globalHistoryTable[_pc] = (globalHistoryTable[_pc] << 1 | outcome) & globalIndexMask;
+
+      // selector
+      // TODO: train selector
+    }
+    break;
   case CUSTOM:
   default:
     break;
