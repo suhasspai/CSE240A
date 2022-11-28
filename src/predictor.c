@@ -255,7 +255,12 @@ train_predictor(uint32_t pc, uint8_t outcome)
       globalHistoryTable[_pc] = (globalHistoryTable[_pc] << 1 | outcome) & globalIndexMask;
 
       // selector
-      // TODO: train selector
+      if((globalResult - localResult) == 1 && selector[globalXorResult] < TST){
+        selector[globalXorResult]++;
+      }
+      if((globalResult - localResult) == -1 && selector[globalXorResult] > TSN){
+        selector[globalXorResult]--;
+      }
     }
     break;
   case CUSTOM:
