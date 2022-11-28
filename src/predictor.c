@@ -205,6 +205,28 @@ train_predictor(uint32_t pc, uint8_t outcome)
       // local predictor
       uint8_t localXorResult = (localHistoryTable[_pc] & localIndexMask);
 
+      if(outcome == TAKEN && globalHistoryTable[localXorResult] < ST){
+        localHistoryTable[localXorResult]++;
+      } 
+      if (outcome == NOTTAKEN && globalHistoryTable[localXorResult] > SN){
+        localHistoryTable[localXorResult]--;
+      }
+
+      localHistoryTable[_pc] = (localHistoryTable[_pc] << 1 | outcome) & localIndexMask;
+
+      // global predictor
+      uint32_t globalXorResult = globalHistory & globalIndexMask;
+
+      if(outcome == TAKEN && globalHistoryTable[globalXorResult] < ST){
+        globalHistoryTable[globalXorResult]++;
+      } 
+      if (outcome == NOTTAKEN && globalHistoryTable[globalXorResult] > SN){
+        globalHistoryTable[globalXorResult]--;
+      }
+
+      globalHistoryTable[_pc] = (globalHistoryTable[_pc] << 1 | outcome) & globalIndexMask;
+
+      // selector
       if (localHistoryTable[localXorResult] == WT || localHistoryTable[localXorResult] == ST){
         if (outcome == TAKEN) {
           localResult = LOCAL_CORRECT;
@@ -218,18 +240,6 @@ train_predictor(uint32_t pc, uint8_t outcome)
           localResult = LOCAL_INCORRECT;
         }
       }
-
-      if(outcome == TAKEN && globalHistoryTable[localXorResult] < ST){
-        localHistoryTable[localXorResult]++;
-      } 
-      if (outcome == NOTTAKEN && globalHistoryTable[localXorResult] > SN){
-        localHistoryTable[localXorResult]--;
-      }
-
-      localHistoryTable[_pc] = (localHistoryTable[_pc] << 1 | outcome) & localIndexMask;
-
-      // global predictor
-      uint32_t globalXorResult = globalHistory & globalIndexMask;
 
       if (globalHistoryTable[globalXorResult] == WT || globalHistoryTable[globalXorResult] == ST){
         if (outcome == TAKEN) {
@@ -245,16 +255,6 @@ train_predictor(uint32_t pc, uint8_t outcome)
         }
       }
 
-      if(outcome == TAKEN && globalHistoryTable[globalXorResult] < ST){
-        globalHistoryTable[globalXorResult]++;
-      } 
-      if (outcome == NOTTAKEN && globalHistoryTable[globalXorResult] > SN){
-        globalHistoryTable[globalXorResult]--;
-      }
-
-      globalHistoryTable[_pc] = (globalHistoryTable[_pc] << 1 | outcome) & globalIndexMask;
-
-      // selector
       if((globalResult - localResult) == 1 && selector[globalXorResult] < TST){
         selector[globalXorResult]++;
       }
