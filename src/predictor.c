@@ -78,13 +78,17 @@ init_predictor()
         localHistoryTableEntries = 1 << lhistoryBits;
         selectorTableEntries = 1 << pcIndexBits;
 
+        globalIndexMask = globalHistoryTableEntries - 1;
+        localIndexMask = localHistoryTableEntries - 1;
+        selectorIndexMask = selectorTableEntries - 1;
+
         globalHistoryTable = (uint8_t*)malloc(globalHistoryTableEntries * sizeof(uint8_t));
         localHistoryTable = (uint8_t*)malloc(localHistoryTableEntries * sizeof(uint8_t));
         selector = (uint8_t*)malloc(selectorTableEntries * sizeof(uint8_t));
 
         for (uint8_t i = 0; i < globalHistoryTableEntries; i++) {
           globalHistoryTable[i] = WN; 
-          selector[i] = TWT; // weal taken global predictor
+          selector[i] = TWT; // weak taken global predictor
         }
 
         for (uint8_t i = 0; i < localHistoryTableEntries; i++) {
@@ -181,13 +185,13 @@ train_predictor(uint32_t pc, uint8_t outcome)
 
     // train gShare
     {
-      uint8_t prediction = (pc & indexMask) ^ (globalHistory & indexMask);
+      uint8_t xorResult = (pc & indexMask) ^ (globalHistory & indexMask);
 
-      if(outcome == TAKEN && globalHistoryTable[prediction] < ST){
-        globalHistoryTable[prediction]++;
+      if(outcome == TAKEN && globalHistoryTable[xorResult] < ST){
+        globalHistoryTable[xorResult]++;
       } 
-      if (outcome == NOTTAKEN && globalHistoryTable[prediction] > SN){
-        globalHistoryTable[prediction]--;
+      if (outcome == NOTTAKEN && globalHistoryTable[xorResult] > SN){
+        globalHistoryTable[xorResult]--;
       }
 
       // Shift global history bits to left and append outcome
