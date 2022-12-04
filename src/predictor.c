@@ -131,7 +131,7 @@ make_prediction(uint64_t pc)
     case GSHARE:
       // predict gShare
       {
-        uint64_t xorResult = (pc & indexMask) ^ (globalHistory & indexMask);
+        xorResult = (pc & indexMask) ^ (globalHistory & indexMask);
 
         if (globalHistoryTable[xorResult] == WT || globalHistoryTable[xorResult] == ST){
           return TAKEN;
@@ -196,7 +196,7 @@ train_predictor(uint64_t pc, uint64_t outcome)
 
     // train gShare
     {
-      uint64_t xorResult = (pc & indexMask) ^ (globalHistory & indexMask);
+      xorResult = (pc & indexMask) ^ (globalHistory & indexMask);
 
       if(outcome == TAKEN && globalHistoryTable[xorResult] < ST){
         globalHistoryTable[xorResult]++;
@@ -214,8 +214,7 @@ train_predictor(uint64_t pc, uint64_t outcome)
     {
       uint64_t _pc = pc & selectorIndexMask;
 
-      // local predictor
-      uint64_t localMask = localXorResult - 1;
+      // local predictor      
       localXorResult = (localHistoryTable[_pc] & localIndexMask);
 
       if(outcome == TAKEN && localPredictionTable[localXorResult] < ST){
