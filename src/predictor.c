@@ -31,20 +31,30 @@ int verbose;
 //------------------------------------//
 
 // gShare
-uint8_t* globalHistoryTable;
-uint8_t globalHistoryTableEntries;
-uint8_t globalHistory;
-uint8_t indexMask;
+uint64_t* globalHistoryTable;
+uint64_t globalHistoryTableEntries;
+uint64_t globalHistory;
+uint64_t indexMask;
+uint64_t xorResult;
 
-// touranment
-uint8_t* localHistoryTable;
-uint8_t* selector;
-uint8_t localHistoryTableEntries;
-uint8_t selectorTableEntries;
-uint8_t localIndexMask;
-uint8_t globalIndexMask;
-uint8_t selectorIndexMask;
+// tournament
+uint64_t* localHistoryTable;
+uint64_t* localPredictionTable;
+uint64_t* selector;
+uint64_t localHistoryTableEntries;
+uint64_t selectorTableEntries;
+uint64_t localIndexMask;
+uint64_t globalIndexMask;
+uint64_t selectorIndexMask;
 
+uint64_t localXorResult;
+uint64_t globalXorResult;
+
+uint64_t localPrediction;
+uint64_t globalPrediction;
+
+uint64_t localResult;
+uint64_t globalResult;
 //------------------------------------//
 //        Predictor Functions         //
 //------------------------------------//
@@ -62,9 +72,9 @@ init_predictor()
         globalHistoryTableEntries = 1 << ghistoryBits;
         indexMask = globalHistoryTableEntries - 1;
         
-        globalHistoryTable = (uint8_t*)malloc(globalHistoryTableEntries * sizeof(uint8_t));
+        globalHistoryTable = (uint64_t*)malloc(globalHistoryTableEntries * sizeof(uint64_t));
 
-        for (uint8_t i = 0; i < globalHistoryTableEntries; i++) {
+        for (uint64_t i = 0; i < globalHistoryTableEntries; i++) {
           globalHistoryTable[i] = WN; 
         }
       }
@@ -82,19 +92,23 @@ init_predictor()
         localIndexMask = localHistoryTableEntries - 1;
         selectorIndexMask = selectorTableEntries - 1;
 
-        globalHistoryTable = (uint8_t*)malloc(globalHistoryTableEntries * sizeof(uint8_t));
-        localHistoryTable = (uint8_t*)malloc(localHistoryTableEntries * sizeof(uint8_t));
-        selector = (uint8_t*)malloc(selectorTableEntries * sizeof(uint8_t));
+        localHistoryTable = (uint64_t*)malloc(selectorTableEntries * sizeof(uint64_t));
+        globalHistoryTable = (uint64_t*)malloc(globalHistoryTableEntries * sizeof(uint64_t));
+        localPredictionTable = (uint64_t*)malloc(localHistoryTableEntries * sizeof(uint64_t));
+        selector = (uint64_t*)malloc(globalHistoryTableEntries * sizeof(uint64_t));
 
-        for (uint8_t i = 0; i < globalHistoryTableEntries; i++) {
+        for (uint64_t i = 0; i < globalHistoryTableEntries; i++) {
           globalHistoryTable[i] = WN; 
           selector[i] = TWT; // weak taken global predictor
         }
 
-        for (uint8_t i = 0; i < localHistoryTableEntries; i++) {
-          localHistoryTable[i] = WN; 
+        for (uint64_t i = 0; i < localHistoryTableEntries; i++) {
+          localHistoryTable[i] = 0; 
         }
 
+        for (uint64_t i = 0; i < localHistoryTableEntries; i++) {
+          localPredictionTable[i] = WN; 
+        }
       }
       break;
 
@@ -107,8 +121,8 @@ init_predictor()
 // Make a prediction for conditional branch instruction at PC 'pc'
 // Returning TAKEN indicates a prediction of taken; returning NOTTAKEN
 // indicates a prediction of not taken
-uint8_t
-make_prediction(uint32_t pc)
+uint64_t
+make_prediction(uint64_t pc)
 {
   // Make a prediction based on the bpType
   switch (bpType) {
@@ -117,7 +131,7 @@ make_prediction(uint32_t pc)
     case GSHARE:
       // predict gShare
       {
-        uint32_t xorResult = (pc & indexMask) ^ (globalHistory & indexMask);
+        uint64_t xorResult = (pc & indexMask) ^ (globalHistory & indexMask);
 
         if (globalHistoryTable[xorResult] == WT || globalHistoryTable[xorResult] == ST){
           return TAKEN;
@@ -130,22 +144,19 @@ make_prediction(uint32_t pc)
     case TOURNAMENT:
       // predict tournament
       {
-        uint8_t localPrediction;
-        uint8_t globalPrediction;
-
-        uint8_t _pc = pc & selectorIndexMask;
+        uint64_t _pc = pc & selectorIndexMask;
 
         // local predictor
-        uint8_t localXorResult = (localHistoryTable[_pc] & localIndexMask);
+        localXorResult = (localHistoryTable[_pc] & localIndexMask);
 
-        if (localHistoryTable[localXorResult] == WT || localHistoryTable[localXorResult] == ST){
+        if (localPredictionTable[localXorResult] == WT || localPredictionTable[localXorResult] == ST){
           localPrediction = TAKEN;
         } else {
           localPrediction = NOTTAKEN;
         }
 
         // global predictor
-        uint32_t globalXorResult = globalHistory & globalIndexMask;
+        globalXorResult = globalHistory & globalIndexMask;
 
         if (globalHistoryTable[globalXorResult] == WT || globalHistoryTable[globalXorResult] == ST){
           globalPrediction = TAKEN;
@@ -176,7 +187,7 @@ make_prediction(uint32_t pc)
 // indicates that the branch was not taken)
 //
 void
-train_predictor(uint32_t pc, uint8_t outcome)
+train_predictor(uint64_t pc, uint64_t outcome)
 {
   switch (bpType) {
   case STATIC:
@@ -185,7 +196,7 @@ train_predictor(uint32_t pc, uint8_t outcome)
 
     // train gShare
     {
-      uint8_t xorResult = (pc & indexMask) ^ (globalHistory & indexMask);
+      uint64_t xorResult = (pc & indexMask) ^ (globalHistory & indexMask);
 
       if(outcome == TAKEN && globalHistoryTable[xorResult] < ST){
         globalHistoryTable[xorResult]++;
@@ -201,25 +212,23 @@ train_predictor(uint32_t pc, uint8_t outcome)
   case TOURNAMENT:
     // train tournament
     {
-      uint8_t localResult;
-      uint8_t globalResult;
-
-      uint8_t _pc = pc & selectorIndexMask;
+      uint64_t _pc = pc & selectorIndexMask;
 
       // local predictor
-      uint8_t localXorResult = (localHistoryTable[_pc] & localIndexMask);
+      uint64_t localMask = localXorResult - 1;
+      localXorResult = (localHistoryTable[_pc] & localIndexMask);
 
-      if(outcome == TAKEN && globalHistoryTable[localXorResult] < ST){
-        localHistoryTable[localXorResult]++;
+      if(outcome == TAKEN && localPredictionTable[localXorResult] < ST){
+        localPredictionTable[localXorResult]++;
       } 
-      if (outcome == NOTTAKEN && globalHistoryTable[localXorResult] > SN){
-        localHistoryTable[localXorResult]--;
+      if (outcome == NOTTAKEN && localPredictionTable[localXorResult] > SN){
+        localPredictionTable[localXorResult]--;
       }
 
       localHistoryTable[_pc] = (localHistoryTable[_pc] << 1 | outcome) & localIndexMask;
 
       // global predictor
-      uint32_t globalXorResult = globalHistory & globalIndexMask;
+      globalXorResult = globalHistory & globalIndexMask;
 
       if(outcome == TAKEN && globalHistoryTable[globalXorResult] < ST){
         globalHistoryTable[globalXorResult]++;
@@ -228,10 +237,10 @@ train_predictor(uint32_t pc, uint8_t outcome)
         globalHistoryTable[globalXorResult]--;
       }
 
-      globalHistoryTable[_pc] = (globalHistoryTable[_pc] << 1 | outcome) & globalIndexMask;
+      globalHistory = (globalHistory << 1 | outcome) & globalIndexMask;
 
       // selector
-      if (localHistoryTable[localXorResult] == WT || localHistoryTable[localXorResult] == ST){
+      if (localPredictionTable[localXorResult] == WT || localPredictionTable[localXorResult] == ST){
         if (outcome == TAKEN) {
           localResult = LOCAL_CORRECT;
         } else {
