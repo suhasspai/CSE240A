@@ -1,0 +1,27 @@
+{
+    "files.associations": {
+        "**/CSE240A-Branch-Predictor/src/*.c": "c",
+        "**/CSE240A-Branch-Predictor/src/*.h": "c"
+    },
+    "editor.tokenColorCustomizations":{
+        "functions": "#C9A9A6",
+        "keywords": "#7393B3",
+        "comments": "#00A36C",
+        "types": "#A95C68",
+        "numbers": "#FFFF8F",
+        "textMateRules": [
+            {
+                "scope": "entity.name.function.preprocessor.c",
+                "settings": {
+                    "foreground": "#E37383",
+                }
+            },
+            {
+                "scope": "storage.modifier.c",
+                "settings": {
+                    "foreground": "#FAC898",
+                }
+            }
+        ]
+    }
+}
