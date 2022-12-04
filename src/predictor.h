@@ -49,6 +49,13 @@ extern const char *bpName[];
 #define GLOBAL_CORRECT 1
 #define GLOBAL_INCORRECT 0
 
+// Custom predictor 3-bit counter
+#define SSN 0
+#define SWN 2
+#define WWT 4
+#define SWT 5
+#define SST 7
+
 //------------------------------------//
 //      Predictor Configuration       //
 //------------------------------------//

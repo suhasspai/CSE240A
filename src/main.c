@@ -41,15 +41,15 @@ handle_option(char *arg)
 {
   if (!strcmp(arg,"--static")) {
     bpType = STATIC;
-  } else if (!strncmp(arg,"--gshare:",9)) {
+  } else if (!strncmp(arg, "--gshare:", 9)) {
     bpType = GSHARE;
-    sscanf(arg+9,"%d", &ghistoryBits);
-  } else if (!strncmp(arg,"--tournament:",13)) {
+    sscanf(arg + 9,"%d", &ghistoryBits);
+  } else if (!strncmp(arg, "--tournament:", 13)) {
     bpType = TOURNAMENT;
-    sscanf(arg+13,"%d:%d:%d", &ghistoryBits, &lhistoryBits, &pcIndexBits);
-  } else if (!strcmp(arg,"--custom")) {
+    sscanf(arg + 13, "%d:%d:%d", &ghistoryBits, &lhistoryBits, &pcIndexBits);
+  } else if (!strcmp(arg, "--custom")) {
     bpType = CUSTOM;
-  } else if (!strcmp(arg,"--verbose")) {
+  } else if (!strcmp(arg, "--verbose")) {
     verbose = 1;
   } else {
     return 0;
@@ -63,8 +63,7 @@ handle_option(char *arg)
 //
 // Returns True if Successful 
 //
-int
-read_branch(uint32_t *pc, uint8_t *outcome)
+int read_branch(uint32_t *pc, uint8_t *outcome)
 {
   if (getline(&buf, &len, stream) == -1) {
     return 0;
@@ -77,8 +76,7 @@ read_branch(uint32_t *pc, uint8_t *outcome)
   return 1;
 }
 
-int
-main(int argc, char *argv[])
+int main(int argc, char *argv[])
 {
   // Set defaults
   stream = stdin;
