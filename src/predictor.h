@@ -70,12 +70,12 @@ void init_predictor();
 // Returning TAKEN indicates a prediction of taken; returning NOTTAKEN
 // indicates a prediction of not taken
 //
-uint64_t make_prediction(uint64_t pc);
+uint8_t make_prediction(uint32_t pc);
 
 // Train the predictor the last executed branch at PC 'pc' and with
 // outcome 'outcome' (true indicates that the branch was taken, false
 // indicates that the branch was not taken)
 //
-void train_predictor(uint64_t pc, uint64_t outcome);
+void train_predictor(uint32_t pc, uint8_t outcome);
 
 #endif
