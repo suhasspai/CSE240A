@@ -1,0 +1,46 @@
+rm -f *.o predictor;
+gcc -g -std=c99 -Werror -c main.c
+gcc -g -std=c99 -Werror -c predictor.c
+gcc -g -std=c99 -Werror -lm -o predictor main.o predictor.o
+running int_1.bz2 trace...
+Branches:           3771697
+Incorrect:           984936
+Misprediction Rate:  26.114
+Branches:           3771697
+Incorrect:           559346
+Misprediction Rate:  14.830
+running int_2.bz2 trace...
+Branches:           3755315
+Incorrect:            36354
+Misprediction Rate:   0.968
+Branches:           3755315
+Incorrect:            19015
+Misprediction Rate:   0.506
+running fp_1.bz2 trace...
+Branches:           1546797
+Incorrect:            22681
+Misprediction Rate:   1.466
+Branches:           1546797
+Incorrect:            15309
+Misprediction Rate:   0.990
+running fp_2.bz2 trace...
+Branches:           2422049
+Incorrect:           259954
+Misprediction Rate:  10.733
+Branches:           2422049
+Incorrect:           162169
+Misprediction Rate:   6.696
+running mm_1.bz2 trace...
+Branches:           3014850
+Incorrect:           501858
+Misprediction Rate:  16.646
+Branches:           3014850
+Incorrect:           206949
+Misprediction Rate:   6.864
+running mm_2.bz2 trace...
+Branches:           2563897
+Incorrect:           388610
+Misprediction Rate:  15.157
+Branches:           2563897
+Incorrect:           236163
+Misprediction Rate:   9.211
