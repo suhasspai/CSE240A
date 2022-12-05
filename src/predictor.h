@@ -52,6 +52,7 @@ extern const char *bpName[];
 // Custom predictor 3-bit counter
 #define SSN 0
 #define SWN 2
+#define WWN 3
 #define WWT 4
 #define SWT 5
 #define SST 7
