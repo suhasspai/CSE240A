@@ -46,11 +46,17 @@ uint16_t globalIndexMask;
 uint16_t selectorIndexMask;
 
 // Custom - TAGE
-uint64_t customGlobalHistory; // Global history
-uint8_t* basePredictor; // Base predictor with 2-bit bimodal counter
+
+// Global history
+uint64_t customGlobalHistory;
+
+// Base predictor with 2-bit bimodal counter
+uint8_t* basePredictor;
 int basePredictorIndexSize;
 uint16_t basePredictorIndexMask;
-uint16_t** taggedPredictors; // 4 tagged predictors
+
+// 4 tagged predictors
+uint16_t** taggedPredictors;
 int taggedPredictorIndexSize;
 uint16_t taggedPredictorIndexMask;
 int tagSize;
@@ -59,14 +65,16 @@ int usefulBitSize;
 uint8_t usefulBitMask;
 int taggedCounterSize;
 uint8_t taggedCounterBitMask;
-int tableAccessed;
-int customGlobalHistoryBits[] = {1, 5, 10, 20};
+int customGlobalHistoryBits[] = {1, 4, 12, 43};
 uint64_t customGlobalHistoryMasks[4];
-uint8_t altpred;
-int useAltOnNa;
-int uBitCounter;
 
-void resetUbitsInPredictor()
+// Auxiliary variables and counters
+int tableAccessed;
+uint8_t altpred;
+int useAltOnNa; // 8-bit signed counter
+int tick; // 4-bit signed counter
+
+void resetUsefulbitsInPredictor()
 {
   int taggedPredictorSize = 1 << taggedPredictorIndexSize;
   for (int i = 0; i < 4; i++)
@@ -91,9 +99,9 @@ void decrementAltCounter()
 
 void decrementUbitCounter()
 {
-  if (uBitCounter > -256)
+  if (tick > -128)
   {
-    uBitCounter--;
+    tick--;
   }
 }
 
@@ -107,32 +115,19 @@ void incrementAltCounter()
 
 void incrementUbitCounter()
 {
-  if (uBitCounter < 255)
+  if (tick < 127)
   {
-    uBitCounter++;
+    tick++;
   }
   else
   {
-    resetUbitsInPredictor();
+    resetUsefulbitsInPredictor();
   }
 }
 
 uint16_t calculateIndexTaggedPredictor(uint32_t pc, uint64_t history, int globalHistoryBits)
 {
   uint16_t taggedPredictorIndex = (uint16_t)(taggedPredictorIndexMask & pc);
-  //uint32_t _pc = pc;
-  /*for (int i = 0; i < 32; i += taggedPredictorIndexSize)
-  {
-    taggedPredictorIndex ^= (uint16_t)(taggedPredictorIndexMask & _pc);
-    _pc >>= taggedPredictorIndexSize;
-  }*/
-  /*uint32_t _pc = pc >> taggedPredictorIndexSize;
-  index ^= (_pc & indexMask);
-  _pc >>= taggedPredictorIndexSize;
-  index ^= (_pc & indexMask);
-  _pc >>= taggedPredictorIndexSize;
-  index ^= _pc;*/
-  //uint64_t _history = history;
   for (int j = 0; j < globalHistoryBits; j += taggedPredictorIndexSize)
   {
     taggedPredictorIndex ^= (uint16_t)(taggedPredictorIndexMask & history);
@@ -215,13 +210,10 @@ void init_predictor()
 
     case CUSTOM:
       {
-        //printf("CUSTOM INITIALIZE\n");
         int basePredictorSize = 1 << 12;
         basePredictor = (uint8_t*)calloc(basePredictorSize, sizeof(uint8_t));
         basePredictorIndexSize = 12;
         basePredictorIndexMask = (1 << basePredictorIndexSize) - 1;
-        //printf("basePredictorIndexMask: %u\n", basePredictorIndexMask);
-
         taggedPredictorIndexSize = 10;
         int taggedPredictorSize = 1 << taggedPredictorIndexSize;
         taggedPredictors = (uint16_t**)malloc(4 * sizeof(uint16_t*));
@@ -235,25 +227,18 @@ void init_predictor()
             customGlobalHistoryMasks[i] = 0;
             customGlobalHistoryMasks[i] = ~customGlobalHistoryMasks[i];
           }
-
-          //printf("customGlobalHistoryMasks[%u] = %lu\n", i, customGlobalHistoryMasks[i]);
         }
 
         taggedPredictorIndexMask = taggedPredictorSize - 1;
-        //printf("taggedPredictorIndexMask: %u\n", taggedPredictorIndexMask);
         tagSize = 8;
         tagMask = 0;
         tagMask = ~tagMask;
-        //printf("tagMask: %u\n", tagMask);
         taggedCounterSize = 3;
         taggedCounterBitMask = (1 << taggedCounterSize) - 1;
-        //printf("taggedCounterBitMask: %u\n", taggedCounterBitMask);
         usefulBitSize = 1;
         usefulBitMask = (1 << usefulBitSize) - 1;
-        //printf("usefulBitMask: %u\n", usefulBitMask);
         useAltOnNa = 0;
-        uBitCounter = 0;
-
+        tick = 0;
         break;
       }
     default:
@@ -322,54 +307,35 @@ uint8_t make_prediction(uint32_t pc)
       // Get base prediction
       tableAccessed = -1;
       uint16_t basePredictorIndex = (uint16_t)(basePredictorIndexMask & pc);
-      //printf("##########################\n");
-      //printf("pc: %u\n", pc);
-      //printf("basePredictorIndex: %u\n", basePredictorIndex);
       uint8_t basePrediction = basePredictor[basePredictorIndex] & (1 << 1);
       altpred = basePrediction;
-      //printf("basePrediction: %u: altpred\n", basePrediction);
       uint8_t taggedCounter, taggedPrediction;
       for (int i = 0; i < 4; i++)
       {
-        //printf("##########################\n");
-        //printf("i: %d\n", i);
         uint64_t history = customGlobalHistory & customGlobalHistoryMasks[i];
-        //printf("history: %lu\n", history);
 
         // Calculate tag
         uint8_t computedTag = calculateCustomTag(pc, history, customGlobalHistoryBits[i]);
-        //printf("computedTag: %u\n", computedTag);
 
         // Calculate index
         uint16_t index = calculateIndexTaggedPredictor(pc, history, customGlobalHistoryBits[i]);
-        //printf("index: %u\n", index);
 
         // Get prediction
         uint16_t counter = taggedPredictors[i][index];
-        //printf("counter: %u\n", counter);
-
         uint16_t _counter = counter;
         uint8_t usefulBits = (uint8_t)(usefulBitMask & _counter);
-        //printf("usefulBits: %u\n", usefulBits);
         _counter >>= usefulBitSize;
         uint8_t counterBits = (uint8_t)(taggedCounterBitMask & _counter);
-        //printf("counterBits: %u\n", counterBits);
         _counter >>= taggedCounterSize;
         uint8_t tagBits = (uint8_t)(tagMask & _counter);
-        //printf("tagBits: %u\n", tagBits);
         if (tagBits == computedTag)
         {
-          //printf("TAG MATCH\n");
           if (tableAccessed != -1)
-          {
             altpred = taggedPrediction;
-            //printf("altpred: %u\n", altpred);
-          }
 
           taggedCounter = counterBits;
           taggedPrediction = taggedCounter >> (taggedCounterSize - 1);
           tableAccessed = i;
-          //printf("tableAccessed: %d\n", tableAccessed);
         }
       }
 
@@ -377,15 +343,11 @@ uint8_t make_prediction(uint32_t pc)
       {
         if ((taggedCounter >= SWN && taggedCounter <= SWT) || useAltOnNa < 0)
         {
-          //printf("decrement alt counter\n");
           decrementAltCounter();
-          //printf("useAltonNa: %d\n", useAltOnNa);
           return taggedPrediction;
         }
         
-        //printf("increment alt counter\n");
         incrementAltCounter();
-        //printf("useAltonNa: %d\n", useAltOnNa);
         return altpred;
       }
 
@@ -497,14 +459,10 @@ void train_predictor(uint32_t pc, uint8_t outcome)
     case CUSTOM:
       {
         uint8_t prediction;
-        //printf("########################\n");
-        //printf("Table: %d\n", tableAccessed);
         if (tableAccessed == -1)
         {
           uint16_t basePredictorIndex = (uint16_t)(basePredictorIndexMask & pc);
-          //printf("basePredictorIndex: %u\n", basePredictorIndex);
           uint8_t predictorState = basePredictor[basePredictorIndex];
-          //printf("predictorState: %u\n", predictorState);
           if (predictorState == ST || predictorState == WT)
           {
             prediction = TAKEN;
@@ -523,23 +481,16 @@ void train_predictor(uint32_t pc, uint8_t outcome)
           {
             basePredictor[basePredictorIndex]--;
           }
-          //printf("new value of basePredictor[%u]: %u\n", basePredictorIndex, basePredictor[basePredictorIndex]);
         }
         else
         {
           uint64_t history = customGlobalHistory & customGlobalHistoryMasks[tableAccessed];
-          //printf("history: %lu\n", history);
           uint16_t taggedPredictorIndex = calculateIndexTaggedPredictor(pc, history, customGlobalHistoryBits[tableAccessed]);
-          //printf("taggedPredictorIndex: %u\n", taggedPredictorIndex);
           uint16_t counter = taggedPredictors[tableAccessed][taggedPredictorIndex];
-          //printf("counter: %u\n", counter);
           uint8_t usefulBits = (uint8_t)(usefulBitMask & counter);
-          //printf("usefulBits: %u\n", usefulBits);
           counter >>= usefulBitSize;
           uint8_t counterBits = (uint8_t)(taggedCounterBitMask & counter);
-          //printf("counterBits: %u\n", counterBits);
           prediction = counterBits >> (taggedCounterSize - 1);
-          //printf("prediction: %u\n", prediction);
           if (prediction == outcome && altpred != outcome)
             usefulBits = 1;
 
@@ -555,13 +506,10 @@ void train_predictor(uint32_t pc, uint8_t outcome)
           }
 
           counter <<= taggedCounterSize;
-          //printf("new value of counterBits: %u\n", counterBits);
           counter |= counterBits;
           counter <<= usefulBitSize;
-          //printf("new value of usefulBits: %u\n", usefulBits);
           counter |= usefulBits;
           taggedPredictors[tableAccessed][taggedPredictorIndex] = counter;
-          //printf("new value of taggedPredictors[%d][%u]: %u\n", tableAccessed, taggedPredictorIndex, taggedPredictors[tableAccessed][taggedPredictorIndex]);
         }
 
         // Misprediction
@@ -572,40 +520,29 @@ void train_predictor(uint32_t pc, uint8_t outcome)
           for (int k = tableAccessed + 1; k < 4; k++)
           {
             uint64_t history = customGlobalHistory & customGlobalHistoryMasks[k];
-            //printf("history: %lu\n", history);
             uint16_t index = calculateIndexTaggedPredictor(pc, history, customGlobalHistoryBits[k]);
-            //printf("index: %u\n", index);
             uint16_t taggedEntry = taggedPredictors[k][index];
-            //printf("Entry pre (taggedPredictors[%d][%u]): %d\n", k, index, taggedEntry);
             if ((taggedEntry & 1) == 0) // successful allocation
             {
-              //printf("Successful allocation\n");
               unallocatedEntryFound = 1;
               uint8_t computedTag = calculateCustomTag(pc, history, customGlobalHistoryBits[k]);
-              //printf("computedTag: %u\n", computedTag);
               uint16_t entry = (uint16_t)computedTag;
               entry <<= 3;
               entry |= outcome == TAKEN ? WWT : WWN;
               entry <<= 1;
               taggedPredictors[k][index] = entry;
-              //printf("Entry post (taggedPredictors[%d][%u]): %d\n", k, index, taggedPredictors[k][index]);
-              //printf("decrement uBit counter\n");
               decrementUbitCounter();
-              //printf("uBitCounter: %d\n", uBitCounter);
               break;
             }
           }
 
           if (!unallocatedEntryFound)
           {
-            //printf("increment uBit counter\n");
             incrementUbitCounter();
-            //printf("uBitCounter: %d\n", uBitCounter);
           }
         }
 
         customGlobalHistory = (customGlobalHistory << 1) | outcome;
-        //printf("New history: %ld\n", customGlobalHistory);
         break;
       }
     default:
